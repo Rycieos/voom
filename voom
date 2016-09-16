@@ -37,6 +37,7 @@ if hash git 2>/dev/null; then
 
   check_update() {
     commits=$(git rev-list --left-only --count origin/master...master)
+    [ $commits -eq 0 ] || log="$(git log --oneline master..origin/master)"
     return $commits
   }
 
@@ -49,9 +50,11 @@ elif hash svn 2>/dev/null; then
   }
 
   check_update() {
-    local remote_version=$(svn info $(svn info | awk '/URL:/ { print $2 }') | awk '/Revision:/ { print $2 }')
+    local url="$(svn info | awk '/URL:/ { print $2 }')"
+    local remote_version=$(svn info "$url" | awk '/Revision:/ { print $2 }')
     local local_version=$(svnversion)
     commits=$((remote_version - local_version))
+    [ $commits -eq 0 ] || log="$(svn log "$url" -l "$commits" | awk '/^r[0-9]+/ { c = 3 } { if (c == 1) { printf("%s %s\n",rev,$0); c = 0 } if (c == 2) {c--} if (c == 3) { rev = $1; c-- }}')"
     return $commits
   }
 
@@ -108,7 +111,7 @@ update_plugin() {
     cd "$dir"
     check_update || {
       update
-      echo "updated $plugin_name: $commits commit(s)"
+      printf "updated %s: %i commit(s)\n%s\n\n" "$plugin_name" "$commits" "$log"
     }
   }
 }
